@@ -1,8 +1,15 @@
-<!doctype html>
-<html>
-    <head>
-        <meta charset="utf-8" />
+<!DOCTYPE html><html><head>
+        <meta charset="utf-8">
         <title>Test App</title>
-    </head>
-    <body></body>
-</html>
+    
+<link rel="preload" href="/agrame-b8f3f08479f938fb20634c3bb5f02759b0cff5e5ffbb2eb18166838f75b9aca348a8cf027a8293165287d552e7d73039_bg.wasm" as="fetch" type="application/wasm" crossorigin="anonymous" integrity="sha384-uPPwhHn5OPsgY0w7tfAnWbDP9eX_uy6xgWaDj3W5rKNIqM8CeoKTFlKH1VLn1zA5">
+<link rel="modulepreload" href="/agrame-b8f3f08479f938fb20634c3bb5f02759b0cff5e5ffbb2eb18166838f75b9aca348a8cf027a8293165287d552e7d73039.js" crossorigin="anonymous" integrity="sha384-GArgmPI2hnbkfSVh-S2TBNrhHh8zB1zuoE6BphTtLQdEappUWEy_ukoIr4PwA9Pv"></head>
+    <body>
+
+
+<script type="module">
+import init, * as bindings from '/agrame-b8f3f08479f938fb20634c3bb5f02759b0cff5e5ffbb2eb18166838f75b9aca348a8cf027a8293165287d552e7d73039.js';
+init('/agrame-b8f3f08479f938fb20634c3bb5f02759b0cff5e5ffbb2eb18166838f75b9aca348a8cf027a8293165287d552e7d73039_bg.wasm');
+window.wasmBindings = bindings;
+
+</script></body></html>
