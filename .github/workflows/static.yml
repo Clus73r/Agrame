@@ -33,7 +33,7 @@ jobs:
           version: 'latest'
 
       - run: trunk build --release
-      - run: git config --global --add safe.directory /github/workspace
+      - run: git config --system --add safe.directory /github/workspace
 
       - uses: ad-m/github-push-action@v0.5.0
         with:
