@@ -16,7 +16,15 @@ fn App() -> Html {
         <div>
             <button {onclick}>{"+1"}</button>
             <p>{*counter}</p>
+            <TextDisplay />
         </div>
+    }
+}
+
+#[function_component]
+fn TextDisplay() -> Html {
+    html! {
+        <textarea id="text_display"></textarea>
     }
 }
 
