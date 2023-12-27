@@ -1,5 +1,6 @@
 use yew::prelude::*;
 
+pub mod ui;
 
 #[function_component]
 fn App() -> Html {
@@ -16,18 +17,12 @@ fn App() -> Html {
         <div>
             <button {onclick}>{"+1"}</button>
             <p>{*counter}</p>
-            <TextDisplay />
+            <crate::ui::grammar_text_input::GrammarTextInput />
         </div>
-    }
-}
-
-#[function_component]
-fn TextDisplay() -> Html {
-    html! {
-        <textarea id="text_display"></textarea>
     }
 }
 
 fn main() {
     yew::Renderer::<App>::new().render();
 }
+
