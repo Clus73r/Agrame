@@ -1,7 +1,14 @@
 use core::fmt;
 
 use gloo_console::log;
-use nom::{IResult, multi::{separated_list1}, character::complete::{alpha1, space0, space1, tab, newline}, bytes::complete::{tag, take_until}, sequence::{tuple, terminated, delimited}, branch::alt, combinator::not};
+use nom::{IResult, multi::separated_list1, character::complete::{alpha1, space0, space1, tab, newline}, bytes::complete::{tag, take_until}, sequence::{tuple, terminated, delimited}, branch::alt, combinator::not};
+
+use crate::grammar::Grammar;
+
+type Result<T> = std::result::Result<T, ParseError>;
+
+#[derive(Debug, Clone)]
+pub struct ParseError;
 
 #[derive(Debug, PartialEq, Eq)]
 struct ParsedProductions {
@@ -93,11 +100,43 @@ fn parse_productions(input: &str) -> IResult<&str, ParsedProductions> {
     Ok((rem, ParsedProductions{ productions: seq }))
 }
 
-pub fn parse(input: &str) -> () {
+fn into_grammar(parse: ParsedProductions) -> Grammar {
+    let mut grammar = Grammar::new();
+
+    fn process_expression(expr: &ProductionExpression, grammar: &mut Grammar) {
+        match expr {
+            ProductionExpression::NonTerminal(non_terminal) => {
+                grammar.add_non_terminal(&non_terminal)
+            },
+            ProductionExpression::Terminal(terminal) => {
+                grammar.add_terminal(&terminal)
+            },
+            ProductionExpression::Sequence(seq) => {
+                for production_expression in seq {
+                    process_expression(production_expression, grammar);
+                }
+            },
+        }
+    }
+
+    for parsed_production in parse.productions {
+        if let ProductionExpression::NonTerminal(lhs) = parsed_production.lhs {
+            grammar.add_non_terminal(&lhs);
+            process_expression(&parsed_production.rhs, &mut grammar)
+        }
+        else{
+            panic!("Faulty grammar");
+        }
+    }
+
+    grammar
+}
+
+pub fn parse(input: &str) -> Result<Grammar> {
     let p = parse_productions(input);
     match p {
-        Ok((_rem, val)) => log!(format!("{val}")),
-        Err(_) => log!("error"),
+        Ok((_rem, val)) => Ok(into_grammar(val)),
+        Err(_) => Err(ParseError),
     }
 }
 
@@ -207,5 +246,4 @@ mod tests {
                 ]
             })));
     }
-
 }

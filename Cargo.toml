@@ -8,6 +8,7 @@ yew = { git = "https://github.com/yewstack/yew/", features = ["csr"] }
 gloo-console = "0.3.0"
 nom = "7.1.3"
 web-sys = "0.3.66"
+id-arena = "2.2.1"
 
 [lib]
 name = "agrame"
