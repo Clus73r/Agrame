@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{collections::HashMap};
 use id_arena::{Arena, Id};
+use rand::{seq::IteratorRandom, thread_rng, rngs::ThreadRng};
 
 type Result<T> = std::result::Result<T, GrammarError>;
 
@@ -11,7 +12,7 @@ type ProductionId = Id<Production>;
 type TerminalId = Id<Terminal>;
 type NonTerminalId = Id<NonTerminal>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct NonTerminal {
     name: String,
     productions: Vec<ProductionId>,
@@ -23,7 +24,7 @@ impl fmt::Display for NonTerminal {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct Terminal {
     name: String,
 }
@@ -34,20 +35,20 @@ impl fmt::Display for Terminal {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Production {
     Terminal(TerminalId),
     NonTerminal(NonTerminalId),
     Sequence(Vec<ProductionId>),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Symbol {
     Terminal(TerminalId),
     NonTerminal(NonTerminalId),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct Grammar {
     terminals: Arena<Terminal>,
     non_terminals: Arena<NonTerminal>,
@@ -116,6 +117,9 @@ impl Grammar {
         if self.non_terminal_map.contains_key(name) { return; }
         let nt = self.non_terminals.alloc(NonTerminal{ name: name.to_string(), productions: Vec::new() });
         self.non_terminal_map.insert(name.to_string(), nt);
+        if self.start_symbol.is_none() {
+            let _ = self.set_start_symbol(name);
+        }
     }
 
     pub fn set_start_symbol(&mut self, name: &str) -> Result<()> {
@@ -173,13 +177,46 @@ impl Grammar {
         self.non_terminals.iter()
     }
 
-    pub fn production_iter(&self) -> id_arena::Iter<'_, Production, id_arena::DefaultArenaBehavior<Production>> {
-        self.productions.iter()
+    pub fn production_iter(&self, non_terminal: &str) -> impl Iterator + '_ {
+        let nt = self.non_terminals.get(*self.non_terminal_map.get(non_terminal).unwrap()).unwrap();
+        nt.productions.iter().map(|p| self.productions.get(*p).unwrap())
+    }
+
+    pub fn produce(&self) -> String {
+        let mut rng = thread_rng();
+        fn apply_production(grammar: &Grammar, production: &Production, rng: &mut ThreadRng) -> String {
+            match production {
+                Production::Terminal(t) => grammar.terminals.get(*t).unwrap().name.clone(),
+                Production::NonTerminal(nt) => {
+                    let next = grammar.non_terminals.get(*nt).unwrap();
+                    let x = next.productions.iter().choose(rng).unwrap();
+                    apply_production(grammar, grammar.productions.get(*x).unwrap(), rng)
+                },
+                Production::Sequence(seq) => {
+                    seq.iter()
+                        .map(|p| apply_production(grammar, grammar.productions.get(*p).unwrap(), rng))
+                        .reduce(|a, p| a + &p).unwrap()
+                    // let x = seq.iter().choose(rng).unwrap();
+                },
+            }
+        }
+        println!("{}", self);
+        match self.start_symbol.as_ref().expect("no start symbol") {
+            Symbol::Terminal(t) => self.terminals.get(*t).unwrap().name.clone(),
+            Symbol::NonTerminal(nt) => {
+                self.non_terminals.get(*nt).unwrap().productions.iter()
+                    .map(|p| apply_production(self, self.productions.get(*p).unwrap(), &mut rng))
+                    .reduce(|a, p| a + &p).unwrap()
+            }
+        }
+        // apply_production(&self, &self.start_symbol.expect("no starty symbol"), &mut rng)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::grammar_parse;
+
     use super::*;
 
     #[test]
@@ -236,4 +273,19 @@ mod tests {
         println!("{}", grammar_a);
     }
 
+    #[test]
+    fn grammar2() {
+        let grammar = grammar_parse::parse("a -> \"a\"").unwrap();
+        let start_symbol = grammar.start_symbol.unwrap();
+        let Symbol::NonTerminal(nt) = start_symbol
+        else { todo!() };
+        println!("hi");
+        grammar.non_terminals.get(nt).unwrap().productions.iter().for_each(|e| println!("{:?}", e));
+    }
+
+    // #[test]
+    // fn produce0() {
+    //     let grammar = grammar_parse::parse("a -> \"a\"");
+    //     let out = grammar.unwrap().produce();
+    // }
 }
