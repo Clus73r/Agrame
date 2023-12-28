@@ -158,12 +158,12 @@ impl Grammar {
         }
     }
 
-    pub fn add_production(&mut self, non_terminal: &str, production: ProductionBuilder) -> Result<()> {
+    pub fn add_production(&mut self, non_terminal: &str, production: ProductionBuilder) -> Result<ProductionId> {
         let production = self.produce_production(production)?;
         match self.non_terminal_map.get(non_terminal) {
             Some(nt) => {
                 self.non_terminals.get_mut(*nt).unwrap().productions.push(production);
-                Ok(())
+                Ok(production)
             }
             None => Err(GrammarError),
         }
@@ -227,15 +227,15 @@ mod tests {
         grammar_a.add_non_terminal("A");
         grammar_a.add_non_terminal("B");
         grammar_a.add_non_terminal("C");
-        let _ = grammar_a.add_production("A", ProductionBuilder::Terminal("a".to_string()));
-        let _ = grammar_a.add_production("A", ProductionBuilder::Terminal("b".to_string()));
+        let prod0 = grammar_a.add_production("A", ProductionBuilder::Terminal("a".to_string()));
+        let prod1 = grammar_a.add_production("A", ProductionBuilder::Terminal("b".to_string()));
         let _ = grammar_a.set_start_symbol("A");
 
         let correct_terminals = &vec!["a", "b"];
         let correct_terminal_iter: Vec<&str> = correct_terminals.iter().map(AsRef::as_ref).collect();
         let terminals: Vec<&str> = grammar_a.terminal_iter().map(|(_, t)| t.name.as_str()).collect();
         let cmp = correct_terminal_iter.eq(&terminals);
-        if !correct_terminal_iter.eq(&terminals) {
+        if !cmp {
             println!("Correct Terminals:");
             for terminal in correct_terminals {
                 println!("{}", terminal);
@@ -251,7 +251,7 @@ mod tests {
         let correct_non_terminal_iter: Vec<&str> = correct_non_terminals.iter().map(AsRef::as_ref).collect();
         let non_terminals: Vec<&str> = grammar_a.non_terminal_iter().map(|(_, t)| t.name.as_str()).collect();
         let cmp = correct_non_terminal_iter.eq(&non_terminals);
-        if !correct_non_terminal_iter.eq(&non_terminals) {
+        if !cmp {
             println!("Correct non_terminals:");
             for non_terminal in correct_non_terminals {
                 println!("{}", non_terminal);
@@ -262,30 +262,61 @@ mod tests {
             }
         }
         assert!(cmp);
-    }
 
-    #[test]
-    fn grammar1() {
-        let mut grammar_a = Grammar::new();
-        grammar_a.add_non_terminal("a");
-        grammar_a.add_non_terminal("a");
-        let _ = grammar_a.add_production("a", ProductionBuilder::NonTerminal("a".to_string()));
-        println!("{}", grammar_a);
-    }
+        let correct_productions = &vec![
+            Production::Terminal(*grammar_a.terminal_map.get("a").unwrap()),
+            Production::Terminal(*grammar_a.terminal_map.get("b").unwrap()),
+        ];
+        let cmp = correct_productions.iter().eq(grammar_a.productions.iter().map(|(_, e)| e));
+        if !cmp {
+            println!("Correct productions:");
+            for production in correct_productions {
+                println!("{:?}", production);
+            }
+            println!("Found productions:");
+            for production in grammar_a.productions.iter() {
+                println!("{:?}", production);
+            }
+        }
+        assert!(cmp);
 
-    #[test]
-    fn grammar2() {
-        let grammar = grammar_parse::parse("a -> \"a\"").unwrap();
-        let start_symbol = grammar.start_symbol.unwrap();
-        let Symbol::NonTerminal(nt) = start_symbol
-        else { todo!() };
-        println!("hi");
-        grammar.non_terminals.get(nt).unwrap().productions.iter().for_each(|e| println!("{:?}", e));
+        let correct_production_ids = &vec![prod0, prod1];
+        let non_terminal = grammar_a.non_terminals.get(*grammar_a.non_terminal_map.get("A").unwrap()).unwrap();
+        let map = non_terminal.productions.iter().map(|e| *e);
+        let other = correct_production_ids.iter().map(|e| e.clone().unwrap());
+        let cmp = map.clone().eq(other.clone());
+        if !cmp {
+            println!("Correct production ids:");
+            for production in other {
+                println!("{:?}", production);
+            }
+            println!("Found production ids:");
+            for production in map {
+                println!("{:?}", production);
+            }
+        }
+        assert!(cmp);
+
     }
 
     // #[test]
-    // fn produce0() {
-    //     let grammar = grammar_parse::parse("a -> \"a\"");
-    //     let out = grammar.unwrap().produce();
+    // fn grammar1() {
+    //     let mut grammar_a = Grammar::new();
+    //     grammar_a.add_non_terminal("a");
+    //     grammar_a.add_non_terminal("a");
+    //     let _ = grammar_a.add_production("a", ProductionBuilder::NonTerminal("a".to_string()));
+    //     println!("{}", grammar_a);
     // }
+
+    // #[test]
+    // fn grammar2() {
+    //     let grammar = grammar_parse::parse("a -> \"a\"").unwrap();
+    //     println!("{}", grammar.production_iter("a").count());
+    // }
+
+//     #[test]
+//     fn produce0() {
+//         let grammar = grammar_parse::parse("a -> \"a\"");
+//         let out = grammar.unwrap().produce();
+//     }
 }

@@ -3,7 +3,7 @@ use core::fmt;
 use gloo_console::log;
 use nom::{IResult, multi::separated_list1, character::complete::{alpha1, space0, space1, tab, newline}, bytes::complete::{tag, take_until}, sequence::{tuple, terminated, delimited}, branch::alt, combinator::not};
 
-use crate::grammar::Grammar;
+use crate::grammar::{Grammar, ProductionBuilder};
 
 type Result<T> = std::result::Result<T, ParseError>;
 
@@ -103,18 +103,23 @@ fn parse_productions(input: &str) -> IResult<&str, ParsedProductions> {
 fn into_grammar(parse: ParsedProductions) -> Grammar {
     let mut grammar = Grammar::new();
 
-    fn process_expression(expr: &ProductionExpression, grammar: &mut Grammar) {
+    fn process_expression(expr: &ProductionExpression, grammar: &mut Grammar) -> ProductionBuilder {
         match expr {
             ProductionExpression::NonTerminal(non_terminal) => {
-                grammar.add_non_terminal(&non_terminal)
+                grammar.add_non_terminal(&non_terminal);
+                ProductionBuilder::NonTerminal(non_terminal.to_string())
             },
             ProductionExpression::Terminal(terminal) => {
-                grammar.add_terminal(&terminal)
+                grammar.add_terminal(&terminal);
+                ProductionBuilder::Terminal(terminal.to_string())
             },
             ProductionExpression::Sequence(seq) => {
-                for production_expression in seq {
-                    process_expression(production_expression, grammar);
-                }
+                let exprs: Vec<ProductionBuilder> = seq.iter().map(|e| process_expression(e, grammar)).collect();
+                ProductionBuilder::Sequence(exprs)
+                // for production_expression in seq {
+                //     process_expression(production_expression, grammar);
+                // }
+                // ProductionBuilder::Sequence(())
             },
         }
     }
@@ -122,7 +127,8 @@ fn into_grammar(parse: ParsedProductions) -> Grammar {
     for parsed_production in parse.productions {
         if let ProductionExpression::NonTerminal(lhs) = parsed_production.lhs {
             grammar.add_non_terminal(&lhs);
-            process_expression(&parsed_production.rhs, &mut grammar)
+            let prod = process_expression(&parsed_production.rhs, &mut grammar);
+            let _ = grammar.add_production(&lhs, prod);
         }
         else{
             panic!("Faulty grammar");
