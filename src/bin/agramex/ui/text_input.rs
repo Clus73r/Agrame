@@ -8,10 +8,10 @@ use crate::GrammarState;
 
 #[function_component]
 pub fn TextInput() -> Html {
-    let (state, dispatch) = use_store::<GrammarState>();
+    // let (state, dispatch) = use_store::<GrammarState>();
     // let onchange: Callback<Event> = dispatch.reduce_mut_callback(|state| state.te += 1);
     log!("textinput run");
-    let oninput = Callback::from(move |event: InputEvent| {
+    let oninput = Callback::from(move |_event: InputEvent| {
         crate::update();
         // update_callback.emit(false);
         // let text_area_element = event.target_dyn_into::<HtmlTextAreaElement>();
