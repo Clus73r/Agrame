@@ -1,7 +1,7 @@
 use core::fmt;
 
-use gloo_console::log;
-use nom::{IResult, multi::separated_list1, character::complete::{alpha1, space0, space1, tab, newline}, bytes::complete::{tag, take_until}, sequence::{tuple, terminated, delimited}, branch::alt, combinator::not};
+
+use nom::{IResult, multi::separated_list1, character::complete::{alpha1, space0, space1, tab, newline}, bytes::complete::{tag, take_until}, sequence::{tuple, delimited}, branch::alt, combinator::not};
 
 use crate::grammar::{Grammar, ProductionBuilder};
 
