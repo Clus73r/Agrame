@@ -4,9 +4,13 @@ use id_arena::{Arena, Id};
 use rand::{seq::IteratorRandom, thread_rng, rngs::ThreadRng};
 
 type Result<T> = std::result::Result<T, GrammarError>;
+type ParseResult<T> = std::result::Result<T, ParseError>;
 
 #[derive(Debug, Clone)]
 pub struct GrammarError;
+
+#[derive(Debug, Clone)]
+pub struct ParseError;
 
 type ProductionId = Id<Production>;
 type TerminalId = Id<Terminal>;
@@ -124,12 +128,14 @@ impl Grammar {
 
     pub fn set_start_symbol(&mut self, name: &str) -> Result<()> {
         if let Some(nt) = self.non_terminal_map.get(name) {
-            return Ok(self.start_symbol = Some(Symbol::NonTerminal(*nt)));
+            self.start_symbol = Some(Symbol::NonTerminal(*nt));
+            return Ok(());
         }
         if let Some(t) = self.terminal_map.get(name) {
-            return Ok(self.start_symbol = Some(Symbol::Terminal(*t)));
+            self.start_symbol = Some(Symbol::Terminal(*t));
+            return Ok(());
         }
-        return Err(GrammarError)
+        Err(GrammarError)
     }
 
     fn produce_production(&mut self, production: ProductionBuilder) -> Result<ProductionId> {
@@ -209,13 +215,66 @@ impl Grammar {
                     .reduce(|a, p| a + &p).unwrap()
             }
         }
-        // apply_production(&self, &self.start_symbol.expect("no starty symbol"), &mut rng)
     }
+
+    pub fn parse_text<'a>(&self, text: &'a str) -> (&'a str, ParseResult<ParseTree>) {
+        match self.start_symbol.clone().unwrap() {
+            Symbol::Terminal(t) => {
+                self.try_terminal(text, self.terminals.get(t).unwrap())
+            }
+            Symbol::NonTerminal(nt) => {
+                self.non_terminals.get(nt).unwrap().productions.iter()
+                    .map(|p| self.try_production(text, self.productions.get(*p).unwrap()))
+                    .find(|e| e.1.is_ok()).unwrap()
+            }
+        }
+    }
+
+    fn try_production<'a>(&self, text: &'a str, production: &Production) -> (&'a str, ParseResult<ParseTree>) {
+        todo!()
+    }
+
+    fn try_terminal<'a>(&self, text: &'a str, terminal: &Terminal) -> (&'a str, ParseResult<ParseTree>) {
+        if terminal.name.len() > text.len() {
+            return (text, Err(ParseError));
+        }
+
+        let text_slice = &text[..terminal.name.len()];
+        if text_slice == terminal.name {
+            (&text[terminal.name.len()..], Ok(ParseTree{
+                node: ParseNode::Terminal(ParseTerminal{name: terminal.name.to_string()}),
+                children: Vec::new()
+            }))
+        } else {
+            (text, Err(ParseError))
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseTree {
+    node: ParseNode,
+    children: Vec<ParseTree>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ParseNode {
+    Terminal(ParseTerminal),
+    NonTerminal(ParseNonTerminal),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseTerminal {
+    name: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseNonTerminal {
+    name: String,
 }
 
 #[cfg(test)]
 mod tests {
-    
 
     use super::*;
 
@@ -297,6 +356,53 @@ mod tests {
         }
         assert!(cmp);
 
+    }
+
+    #[test]
+    fn parse0() {
+        let grammar = crate::grammar_parse::parse("a -> \"a\"").unwrap();
+        let (rem, Ok(tree)) = grammar.parse_text("a")
+        else {todo!()};
+
+        assert_eq!(tree, ParseTree{
+            node: ParseNode::Terminal(ParseTerminal{
+                name: "a".to_string(),
+            }),
+            children: Vec::new(),
+        });
+        assert_eq!(rem, "");
+    }
+
+    #[test]
+    fn parse1() {
+        let grammar = crate::grammar_parse::parse("a -> \"a\"").unwrap();
+        let (rem, Ok(tree)) = grammar.try_terminal("a", &Terminal{
+            name: "a".to_string(),
+        })
+        else {
+            todo!()
+        };
+
+        assert_eq!(tree, ParseTree{
+            node: ParseNode::Terminal(ParseTerminal{
+                name: "a".to_string(),
+            }),
+            children: Vec::new(),
+        });
+        assert_eq!(rem, "");
+    }
+
+    #[test]
+    fn parse2() {
+        let grammar = crate::grammar_parse::parse("a -> \"a\"").unwrap();
+        let (rem, Err(ParseError)) = grammar.try_terminal("b", &Terminal{
+            name: "a".to_string(),
+        })
+        else {
+            todo!()
+        };
+
+        assert_eq!(rem, "b");
     }
 
     // #[test]

@@ -106,11 +106,11 @@ fn into_grammar(parse: ParsedProductions) -> Grammar {
     fn process_expression(expr: &ProductionExpression, grammar: &mut Grammar) -> ProductionBuilder {
         match expr {
             ProductionExpression::NonTerminal(non_terminal) => {
-                grammar.add_non_terminal(&non_terminal);
+                grammar.add_non_terminal(non_terminal);
                 ProductionBuilder::NonTerminal(non_terminal.to_string())
             },
             ProductionExpression::Terminal(terminal) => {
-                grammar.add_terminal(&terminal);
+                grammar.add_terminal(terminal);
                 ProductionBuilder::Terminal(terminal.to_string())
             },
             ProductionExpression::Sequence(seq) => {
