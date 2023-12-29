@@ -1,7 +1,6 @@
-
 use gloo_console::log;
+use web_sys::InputEvent;
 use yew::prelude::*;
-use web_sys::{InputEvent};
 
 #[function_component]
 pub fn TextInput() -> Html {

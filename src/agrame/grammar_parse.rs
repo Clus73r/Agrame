@@ -1,7 +1,14 @@
 use core::fmt;
 
-
-use nom::{IResult, multi::separated_list1, character::complete::{alpha1, space0, space1, tab, newline}, bytes::complete::{tag, take_until}, sequence::{tuple, delimited}, branch::alt, combinator::not};
+use nom::{
+    branch::alt,
+    bytes::complete::{tag, take_until},
+    character::complete::{alpha1, newline, space0, space1, tab},
+    combinator::not,
+    multi::separated_list1,
+    sequence::{delimited, tuple},
+    IResult,
+};
 
 use crate::grammar::{Grammar, ProductionBuilder};
 
@@ -17,7 +24,13 @@ struct ParsedProductions {
 
 impl fmt::Display for ParsedProductions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Sequence: {}", self.productions.iter().fold("".to_string(), |s, e| s + &format!("{e}")))
+        write!(
+            f,
+            "Sequence: {}",
+            self.productions
+                .iter()
+                .fold("".to_string(), |s, e| s + &format!("{e}"))
+        )
     }
 }
 
@@ -46,7 +59,11 @@ impl fmt::Display for ProductionExpression {
             ProductionExpression::NonTerminal(val) => write!(f, "NonTerminal: {}", val),
             ProductionExpression::Terminal(val) => write!(f, "Terminal: {}", val),
             ProductionExpression::Sequence(seq) => {
-                write!(f, "Sequence: {}", seq.iter().fold("".to_string(), |s, e| s + &format!("{e}")))
+                write!(
+                    f,
+                    "Sequence: {}",
+                    seq.iter().fold("".to_string(), |s, e| s + &format!("{e}"))
+                )
             }
         }
     }
@@ -67,15 +84,13 @@ fn parse_terminal(input: &str) -> IResult<&str, ProductionExpression> {
     let (rem, p) = delimited(
         nom::character::complete::char('"'),
         take_until("\""),
-        nom::character::complete::char('"'))(input)?;
+        nom::character::complete::char('"'),
+    )(input)?;
     Ok((rem, ProductionExpression::Terminal(p.to_string())))
 }
 
 fn parse_expression(input: &str) -> IResult<&str, ProductionExpression> {
-    alt((
-        parse_terminal,
-        parse_non_terminal,
-    ))(input)
+    alt((parse_terminal, parse_non_terminal))(input)
 }
 
 fn parse_sequence(input: &str) -> IResult<&str, ProductionExpression> {
@@ -84,20 +99,16 @@ fn parse_sequence(input: &str) -> IResult<&str, ProductionExpression> {
 }
 
 fn parse_production(input: &str) -> IResult<&str, ParsedProduction> {
-    let res = tuple((
-        parse_non_terminal,
-        parse_arrow,
-        parse_sequence,
-    ))(input);
+    let res = tuple((parse_non_terminal, parse_arrow, parse_sequence))(input);
     match res {
-        Ok((rem, (id0, _, id1))) => Ok((rem, ParsedProduction{lhs: id0, rhs: id1})),
+        Ok((rem, (id0, _, id1))) => Ok((rem, ParsedProduction { lhs: id0, rhs: id1 })),
         Err(err) => Err(err),
     }
 }
 
 fn parse_productions(input: &str) -> IResult<&str, ParsedProductions> {
     let (rem, seq) = separated_list1(tuple((newline, not(tab))), parse_production)(input)?;
-    Ok((rem, ParsedProductions{ productions: seq }))
+    Ok((rem, ParsedProductions { productions: seq }))
 }
 
 fn into_grammar(parse: ParsedProductions) -> Grammar {
@@ -108,19 +119,20 @@ fn into_grammar(parse: ParsedProductions) -> Grammar {
             ProductionExpression::NonTerminal(non_terminal) => {
                 grammar.add_non_terminal(non_terminal);
                 ProductionBuilder::NonTerminal(non_terminal.to_string())
-            },
+            }
             ProductionExpression::Terminal(terminal) => {
                 grammar.add_terminal(terminal);
                 ProductionBuilder::Terminal(terminal.to_string())
-            },
+            }
             ProductionExpression::Sequence(seq) => {
-                let exprs: Vec<ProductionBuilder> = seq.iter().map(|e| process_expression(e, grammar)).collect();
+                let exprs: Vec<ProductionBuilder> =
+                    seq.iter().map(|e| process_expression(e, grammar)).collect();
                 ProductionBuilder::Sequence(exprs)
                 // for production_expression in seq {
                 //     process_expression(production_expression, grammar);
                 // }
                 // ProductionBuilder::Sequence(())
-            },
+            }
         }
     }
 
@@ -129,8 +141,7 @@ fn into_grammar(parse: ParsedProductions) -> Grammar {
             grammar.add_non_terminal(&lhs);
             let prod = process_expression(&parsed_production.rhs, &mut grammar);
             let _ = grammar.add_production(&lhs, prod);
-        }
-        else{
+        } else {
             panic!("Faulty grammar");
         }
     }
@@ -152,14 +163,21 @@ mod tests {
 
     #[test]
     fn parse_non_terminal0() {
-        assert_eq!(super::parse_non_terminal("abc"),
-            IResult::Ok(("", ProductionExpression::NonTerminal("abc".to_string()))));
+        assert_eq!(
+            super::parse_non_terminal("abc"),
+            IResult::Ok(("", ProductionExpression::NonTerminal("abc".to_string())))
+        );
     }
 
     #[test]
     fn parse_non_terminal1() {
-        assert_eq!(super::parse_non_terminal("abc kfjd"),
-            IResult::Ok((" kfjd", ProductionExpression::NonTerminal("abc".to_string()))));
+        assert_eq!(
+            super::parse_non_terminal("abc kfjd"),
+            IResult::Ok((
+                " kfjd",
+                ProductionExpression::NonTerminal("abc".to_string())
+            ))
+        );
     }
 
     #[test]
@@ -169,14 +187,18 @@ mod tests {
 
     #[test]
     fn parse_terminal0() {
-        assert_eq!(super::parse_terminal("\"abc\""),
-            IResult::Ok(("", ProductionExpression::Terminal("abc".to_string()))));
+        assert_eq!(
+            super::parse_terminal("\"abc\""),
+            IResult::Ok(("", ProductionExpression::Terminal("abc".to_string())))
+        );
     }
 
     #[test]
     fn parse_terminal1() {
-        assert_eq!(super::parse_terminal("\"abc\" bca"),
-            IResult::Ok((" bca", ProductionExpression::Terminal("abc".to_string()))));
+        assert_eq!(
+            super::parse_terminal("\"abc\" bca"),
+            IResult::Ok((" bca", ProductionExpression::Terminal("abc".to_string())))
+        );
     }
 
     #[test]
@@ -186,70 +208,94 @@ mod tests {
 
     #[test]
     fn parse_expression0() {
-        assert_eq!(super::parse_expression("abc"),
-            IResult::Ok(("", ProductionExpression::NonTerminal("abc".to_string()))));
+        assert_eq!(
+            super::parse_expression("abc"),
+            IResult::Ok(("", ProductionExpression::NonTerminal("abc".to_string())))
+        );
     }
 
     #[test]
     fn parse_expression1() {
-        assert_eq!(super::parse_expression("\"abc\""),
-            IResult::Ok(("", ProductionExpression::Terminal("abc".to_string()))));
+        assert_eq!(
+            super::parse_expression("\"abc\""),
+            IResult::Ok(("", ProductionExpression::Terminal("abc".to_string())))
+        );
     }
 
     #[test]
     fn parse_production0() {
-        assert_eq!(super::parse_production("a->a"),
-            IResult::Ok(("", ParsedProduction{
-                lhs: ProductionExpression::NonTerminal("a".to_string()),
-                rhs: ProductionExpression::Sequence(vec![
-                    ProductionExpression::NonTerminal("a".to_string()),
-                ])
-            })));
+        assert_eq!(
+            super::parse_production("a->a"),
+            IResult::Ok((
+                "",
+                ParsedProduction {
+                    lhs: ProductionExpression::NonTerminal("a".to_string()),
+                    rhs: ProductionExpression::Sequence(vec![ProductionExpression::NonTerminal(
+                        "a".to_string()
+                    ),])
+                }
+            ))
+        );
     }
 
     #[test]
     fn parse_production1() {
-        assert_eq!(super::parse_production("a -> a b"),
-            IResult::Ok(("", ParsedProduction{
-                lhs: ProductionExpression::NonTerminal("a".to_string()),
-                rhs: ProductionExpression::Sequence(vec![
-                    ProductionExpression::NonTerminal("a".to_string()),
-                    ProductionExpression::NonTerminal("b".to_string()),
-                ])
-            })));
+        assert_eq!(
+            super::parse_production("a -> a b"),
+            IResult::Ok((
+                "",
+                ParsedProduction {
+                    lhs: ProductionExpression::NonTerminal("a".to_string()),
+                    rhs: ProductionExpression::Sequence(vec![
+                        ProductionExpression::NonTerminal("a".to_string()),
+                        ProductionExpression::NonTerminal("b".to_string()),
+                    ])
+                }
+            ))
+        );
     }
 
     #[test]
     fn parse_production2() {
-        assert_eq!(super::parse_production("a -> \"a\" b"),
-            IResult::Ok(("", ParsedProduction{
-                lhs: ProductionExpression::NonTerminal("a".to_string()),
-                rhs: ProductionExpression::Sequence(vec![
-                    ProductionExpression::Terminal("a".to_string()),
-                    ProductionExpression::NonTerminal("b".to_string()),
-                ])
-            })));
+        assert_eq!(
+            super::parse_production("a -> \"a\" b"),
+            IResult::Ok((
+                "",
+                ParsedProduction {
+                    lhs: ProductionExpression::NonTerminal("a".to_string()),
+                    rhs: ProductionExpression::Sequence(vec![
+                        ProductionExpression::Terminal("a".to_string()),
+                        ProductionExpression::NonTerminal("b".to_string()),
+                    ])
+                }
+            ))
+        );
     }
 
     #[test]
     fn parse_productions0() {
-        assert_eq!(super::parse_productions("a -> a b\nb -> \"b\""),
-            IResult::Ok(("", ParsedProductions {
-                productions: vec![
-                    ParsedProduction {
-                        lhs: ProductionExpression::NonTerminal("a".to_string()),
-                        rhs: ProductionExpression::Sequence(vec![
-                            ProductionExpression::NonTerminal("a".to_string()),
-                            ProductionExpression::NonTerminal("b".to_string()),
-                        ])
-                    },
-                    ParsedProduction {
-                        lhs: ProductionExpression::NonTerminal("b".to_string()),
-                        rhs: ProductionExpression::Sequence(vec![
-                            ProductionExpression::Terminal("b".to_string()),
-                        ])
-                    },
-                ]
-            })));
+        assert_eq!(
+            super::parse_productions("a -> a b\nb -> \"b\""),
+            IResult::Ok((
+                "",
+                ParsedProductions {
+                    productions: vec![
+                        ParsedProduction {
+                            lhs: ProductionExpression::NonTerminal("a".to_string()),
+                            rhs: ProductionExpression::Sequence(vec![
+                                ProductionExpression::NonTerminal("a".to_string()),
+                                ProductionExpression::NonTerminal("b".to_string()),
+                            ])
+                        },
+                        ParsedProduction {
+                            lhs: ProductionExpression::NonTerminal("b".to_string()),
+                            rhs: ProductionExpression::Sequence(vec![
+                                ProductionExpression::Terminal("b".to_string()),
+                            ])
+                        },
+                    ]
+                }
+            ))
+        );
     }
 }

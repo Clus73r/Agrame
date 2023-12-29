@@ -1,7 +1,7 @@
 use core::fmt;
-use std::{collections::HashMap};
 use id_arena::{Arena, Id};
-use rand::{seq::IteratorRandom, thread_rng, rngs::ThreadRng};
+use rand::{rngs::ThreadRng, seq::IteratorRandom, thread_rng};
+use std::collections::HashMap;
 
 type Result<T> = std::result::Result<T, GrammarError>;
 type ParseResult<T> = std::result::Result<T, ParseError>;
@@ -68,27 +68,38 @@ impl fmt::Display for Grammar {
             match production {
                 Production::Terminal(t) => format!("{}", grammar.terminals[*t]),
                 Production::NonTerminal(n) => format!("{}", grammar.non_terminals[*n]),
-                Production::Sequence(s) => {
-                    s.iter()
-                        .map(|e| process_production(grammar, &grammar.productions[*e]))
-                        .reduce(|a, e| a + ", " + &e).unwrap_or("".to_string())
-                },
+                Production::Sequence(s) => s
+                    .iter()
+                    .map(|e| process_production(grammar, &grammar.productions[*e]))
+                    .reduce(|a, e| a + ", " + &e)
+                    .unwrap_or("".to_string()),
             }
         }
-        let terminals = self.terminals.iter()
+        let terminals = self
+            .terminals
+            .iter()
+            .map(|(id, t)| format!("{:?}: {}", id, t))
+            .reduce(|a, e| a + "\n" + &e)
+            .unwrap_or("".to_string());
+        let non_terminals = self
+            .non_terminals
+            .iter()
             .map(|(id, t)| {
-                format!("{:?}: {}", id, t)
-            })
-            .reduce(|a, e| a + "\n" + &e).unwrap_or("".to_string());
-        let non_terminals = self.non_terminals.iter()
-            .map(|(id, t)| {
-                let productions = t.productions.iter()
+                let productions = t
+                    .productions
+                    .iter()
                     .map(|e| process_production(self, &self.productions[*e]))
-                    .reduce(|a, e| a + "\n" + &e).unwrap_or("".to_string());
+                    .reduce(|a, e| a + "\n" + &e)
+                    .unwrap_or("".to_string());
                 format!("{:?}: {}", id, t) + &format!("\n{}", productions)
             })
-            .reduce(|a, e| a + "\n" + &e).unwrap_or("".to_string());
-        write!(f, "Terminal:\n{}\nNonTerminals:\n{}", terminals, non_terminals)
+            .reduce(|a, e| a + "\n" + &e)
+            .unwrap_or("".to_string());
+        write!(
+            f,
+            "Terminal:\n{}\nNonTerminals:\n{}",
+            terminals, non_terminals
+        )
     }
 }
 
@@ -112,14 +123,23 @@ impl Grammar {
     }
 
     pub fn add_terminal(&mut self, name: &str) {
-        if self.terminal_map.contains_key(name) { return; }
-        let t = self.terminals.alloc(Terminal{ name: name.to_string() });
+        if self.terminal_map.contains_key(name) {
+            return;
+        }
+        let t = self.terminals.alloc(Terminal {
+            name: name.to_string(),
+        });
         self.terminal_map.insert(name.to_string(), t);
     }
 
     pub fn add_non_terminal(&mut self, name: &str) {
-        if self.non_terminal_map.contains_key(name) { return; }
-        let nt = self.non_terminals.alloc(NonTerminal{ name: name.to_string(), productions: Vec::new() });
+        if self.non_terminal_map.contains_key(name) {
+            return;
+        }
+        let nt = self.non_terminals.alloc(NonTerminal {
+            name: name.to_string(),
+            productions: Vec::new(),
+        });
         self.non_terminal_map.insert(name.to_string(), nt);
         if self.start_symbol.is_none() {
             let _ = self.set_start_symbol(name);
@@ -146,131 +166,230 @@ impl Grammar {
                     Some(terminal) => Ok(self.productions.alloc(Production::Terminal(*terminal))),
                     None => Err(GrammarError),
                 }
-            },
+            }
             ProductionBuilder::NonTerminal(name) => {
                 self.add_non_terminal(&name);
                 match self.non_terminal_map.get(&name) {
-                    Some(non_terminal) => Ok(self.productions.alloc(Production::NonTerminal(*non_terminal))),
+                    Some(non_terminal) => Ok(self
+                        .productions
+                        .alloc(Production::NonTerminal(*non_terminal))),
                     None => Err(GrammarError),
                 }
-            },
+            }
             ProductionBuilder::Sequence(seq) => {
-                let mapped: Result<Vec<ProductionId>> = seq.into_iter().map(|e| self.produce_production(e)).collect();
+                let mapped: Result<Vec<ProductionId>> = seq
+                    .into_iter()
+                    .map(|e| self.produce_production(e))
+                    .collect();
                 match mapped {
                     Ok(seq) => Ok(self.productions.alloc(Production::Sequence(seq))),
                     Err(_) => Err(GrammarError),
                 }
-            },
+            }
         }
     }
 
-    pub fn add_production(&mut self, non_terminal: &str, production: ProductionBuilder) -> Result<ProductionId> {
+    pub fn add_production(
+        &mut self,
+        non_terminal: &str,
+        production: ProductionBuilder,
+    ) -> Result<ProductionId> {
         let production = self.produce_production(production)?;
         match self.non_terminal_map.get(non_terminal) {
             Some(nt) => {
-                self.non_terminals.get_mut(*nt).unwrap().productions.push(production);
+                self.non_terminals
+                    .get_mut(*nt)
+                    .unwrap()
+                    .productions
+                    .push(production);
                 Ok(production)
             }
             None => Err(GrammarError),
         }
     }
 
-    pub fn terminal_iter(&self) -> id_arena::Iter<'_, Terminal, id_arena::DefaultArenaBehavior<Terminal>> {
+    pub fn terminal_iter(
+        &self,
+    ) -> id_arena::Iter<'_, Terminal, id_arena::DefaultArenaBehavior<Terminal>> {
         self.terminals.iter()
     }
 
-    pub fn non_terminal_iter(&self) -> id_arena::Iter<'_, NonTerminal, id_arena::DefaultArenaBehavior<NonTerminal>> {
+    pub fn terminal(&self, name: &str) -> &Terminal {
+        self.terminals.get(*self.terminal_map.get(name).unwrap()).unwrap()
+    }
+
+    pub fn non_terminal_iter(
+        &self,
+    ) -> id_arena::Iter<'_, NonTerminal, id_arena::DefaultArenaBehavior<NonTerminal>> {
         self.non_terminals.iter()
     }
 
+    pub fn non_terminal(&self, name: &str) -> &NonTerminal {
+        self.non_terminals.get(*self.non_terminal_map.get(name).unwrap()).unwrap()
+    }
+
     pub fn production_iter(&self, non_terminal: &str) -> impl Iterator + '_ {
-        let nt = self.non_terminals.get(*self.non_terminal_map.get(non_terminal).unwrap()).unwrap();
-        nt.productions.iter().map(|p| self.productions.get(*p).unwrap())
+        let nt = self
+            .non_terminals
+            .get(*self.non_terminal_map.get(non_terminal).unwrap())
+            .unwrap();
+        nt.productions
+            .iter()
+            .map(|p| self.productions.get(*p).unwrap())
     }
 
     pub fn produce(&self) -> String {
         let mut rng = thread_rng();
-        fn apply_production(grammar: &Grammar, production: &Production, rng: &mut ThreadRng) -> String {
+        fn apply_production(
+            grammar: &Grammar,
+            production: &Production,
+            rng: &mut ThreadRng,
+        ) -> String {
             match production {
                 Production::Terminal(t) => grammar.terminals.get(*t).unwrap().name.clone(),
                 Production::NonTerminal(nt) => {
                     let next = grammar.non_terminals.get(*nt).unwrap();
                     let x = next.productions.iter().choose(rng).unwrap();
                     apply_production(grammar, grammar.productions.get(*x).unwrap(), rng)
-                },
+                }
                 Production::Sequence(seq) => {
                     seq.iter()
-                        .map(|p| apply_production(grammar, grammar.productions.get(*p).unwrap(), rng))
-                        .reduce(|a, p| a + &p).unwrap()
+                        .map(|p| {
+                            apply_production(grammar, grammar.productions.get(*p).unwrap(), rng)
+                        })
+                        .reduce(|a, p| a + &p)
+                        .unwrap()
                     // let x = seq.iter().choose(rng).unwrap();
-                },
+                }
             }
         }
         println!("{}", self);
         match self.start_symbol.as_ref().expect("no start symbol") {
             Symbol::Terminal(t) => self.terminals.get(*t).unwrap().name.clone(),
-            Symbol::NonTerminal(nt) => {
-                self.non_terminals.get(*nt).unwrap().productions.iter()
-                    .map(|p| apply_production(self, self.productions.get(*p).unwrap(), &mut rng))
-                    .reduce(|a, p| a + &p).unwrap()
-            }
+            Symbol::NonTerminal(nt) => self
+                .non_terminals
+                .get(*nt)
+                .unwrap()
+                .productions
+                .iter()
+                .map(|p| apply_production(self, self.productions.get(*p).unwrap(), &mut rng))
+                .reduce(|a, p| a + &p)
+                .unwrap(),
         }
     }
 
-    pub fn parse_text<'a>(&self, text: &'a str) -> (&'a str, ParseResult<ParseTree>) {
+    pub fn parse_text<'a>(&self, text: &'a str) -> (&'a str, ParseResult<ParseNode>) {
         match self.start_symbol.clone().unwrap() {
-            Symbol::Terminal(t) => {
-                self.try_terminal(text, self.terminals.get(t).unwrap())
-            }
+            Symbol::Terminal(t) => self.try_terminal(text, self.terminals.get(t).unwrap()),
             Symbol::NonTerminal(nt) => {
-                self.non_terminals.get(nt).unwrap().productions.iter()
-                    .map(|p| self.try_production(text, self.productions.get(*p).unwrap()))
-                    .find(|e| e.1.is_ok()).unwrap()
-            }
+                self.try_non_terminal(text, self.non_terminals.get(nt).unwrap())
+            } //
+              // .productions
+              // .iter()
+              // .map(|p| self.try_production(text, self.productions.get(*p).unwrap()))
+              // .find(|e| e.1.is_ok())
+              // .unwrap(),
         }
     }
 
-    fn try_production<'a>(&self, text: &'a str, production: &Production) -> (&'a str, ParseResult<ParseTree>) {
-        todo!()
+    fn try_production<'a>(
+        &self,
+        text: &'a str,
+        production: &Production,
+    ) -> (&'a str, ParseResult<ParseNode>) {
+        match production {
+            Production::Terminal(t) => self.try_terminal(text, self.terminals.get(*t).unwrap()),
+            Production::NonTerminal(nt) => self.try_non_terminal(text, self.non_terminals.get(*nt).unwrap()) ,
+            Production::Sequence(seq) => self.try_sequence(text, seq)
+            //     ParseNode::Sequence(ParseSequence{
+            //     content: seq.iter() .map(|p| self.try_production(text, self.productions.get(*p).unwrap())).collect(),
+            // }),
+        }
     }
 
-    fn try_terminal<'a>(&self, text: &'a str, terminal: &Terminal) -> (&'a str, ParseResult<ParseTree>) {
+    fn try_sequence<'a>(
+        &self,
+        text: &'a str,
+        sequence: &Vec<ProductionId>,
+        ) -> (&'a str, ParseResult<ParseNode>){
+        let eval: Vec<(&str, ParseResult<ParseNode>)> = sequence.iter().map(|p| self.try_production(text, self.productions.get(*p).unwrap())).collect();
+        if eval.iter().any(|(_, res)| res.is_err()) {
+            return (text, Err(ParseError));
+        }
+        let last_elem = eval.iter().last().unwrap();
+        let nodes = eval.iter().map(|(_, e)| e.clone().unwrap());
+        (last_elem.0, Ok(ParseNode::Sequence(ParseSequence{
+            content: nodes.collect(),
+        })))
+    }
+
+    fn try_non_terminal<'a>(
+        &self,
+        text: &'a str,
+        non_terminal: &NonTerminal,
+    ) -> (&'a str, ParseResult<ParseNode>) {
+        let (rem, produced) = non_terminal
+            .productions
+            .iter()
+            .map(|p| self.try_production(text, self.productions.get(*p).unwrap()))
+            .find(|e| e.1.is_ok())
+            .unwrap();
+        match produced {
+            Ok(produced_tree) => (
+                rem,
+                Ok(ParseNode::NonTerminal(ParseNonTerminal {
+                    name: non_terminal.name.clone(),
+                    child: Box::new(produced_tree),
+                })),
+            ),
+            Err(x) => (text, Err(x)),
+        }
+    }
+
+    fn try_terminal<'a>(
+        &self,
+        text: &'a str,
+        terminal: &Terminal,
+    ) -> (&'a str, ParseResult<ParseNode>) {
         if terminal.name.len() > text.len() {
             return (text, Err(ParseError));
         }
 
         let text_slice = &text[..terminal.name.len()];
         if text_slice == terminal.name {
-            (&text[terminal.name.len()..], Ok(ParseTree{
-                node: ParseNode::Terminal(ParseTerminal{name: terminal.name.to_string()}),
-                children: Vec::new()
-            }))
+            (
+                &text[terminal.name.len()..],
+                Ok(ParseNode::Terminal(ParseTerminal {
+                    name: terminal.name.to_string(),
+                })),
+            )
         } else {
             (text, Err(ParseError))
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct ParseTree {
-    node: ParseNode,
-    children: Vec<ParseTree>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParseNode {
     Terminal(ParseTerminal),
     NonTerminal(ParseNonTerminal),
+    Sequence(ParseSequence),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ParseTerminal {
     name: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ParseSequence {
+    content: Vec<ParseNode>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ParseNonTerminal {
     name: String,
+    child: Box<ParseNode>,
 }
 
 #[cfg(test)]
@@ -291,8 +410,12 @@ mod tests {
         let _ = grammar_a.set_start_symbol("A");
 
         let correct_terminals = &vec!["a", "b"];
-        let correct_terminal_iter: Vec<&str> = correct_terminals.iter().map(AsRef::as_ref).collect();
-        let terminals: Vec<&str> = grammar_a.terminal_iter().map(|(_, t)| t.name.as_str()).collect();
+        let correct_terminal_iter: Vec<&str> =
+            correct_terminals.iter().map(AsRef::as_ref).collect();
+        let terminals: Vec<&str> = grammar_a
+            .terminal_iter()
+            .map(|(_, t)| t.name.as_str())
+            .collect();
         let cmp = correct_terminal_iter.eq(&terminals);
         if !cmp {
             println!("Correct Terminals:");
@@ -307,8 +430,12 @@ mod tests {
         assert!(cmp);
 
         let correct_non_terminals = &vec!["A", "B", "C"];
-        let correct_non_terminal_iter: Vec<&str> = correct_non_terminals.iter().map(AsRef::as_ref).collect();
-        let non_terminals: Vec<&str> = grammar_a.non_terminal_iter().map(|(_, t)| t.name.as_str()).collect();
+        let correct_non_terminal_iter: Vec<&str> =
+            correct_non_terminals.iter().map(AsRef::as_ref).collect();
+        let non_terminals: Vec<&str> = grammar_a
+            .non_terminal_iter()
+            .map(|(_, t)| t.name.as_str())
+            .collect();
         let cmp = correct_non_terminal_iter.eq(&non_terminals);
         if !cmp {
             println!("Correct non_terminals:");
@@ -326,7 +453,9 @@ mod tests {
             Production::Terminal(*grammar_a.terminal_map.get("a").unwrap()),
             Production::Terminal(*grammar_a.terminal_map.get("b").unwrap()),
         ];
-        let cmp = correct_productions.iter().eq(grammar_a.productions.iter().map(|(_, e)| e));
+        let cmp = correct_productions
+            .iter()
+            .eq(grammar_a.productions.iter().map(|(_, e)| e));
         if !cmp {
             println!("Correct productions:");
             for production in correct_productions {
@@ -340,7 +469,10 @@ mod tests {
         assert!(cmp);
 
         let correct_production_ids = &vec![prod0, prod1];
-        let non_terminal = grammar_a.non_terminals.get(*grammar_a.non_terminal_map.get("A").unwrap()).unwrap();
+        let non_terminal = grammar_a
+            .non_terminals
+            .get(*grammar_a.non_terminal_map.get("A").unwrap())
+            .unwrap();
         let map = non_terminal.productions.iter().map(|e| *e);
         let other = correct_production_ids.iter().map(|e| e.clone().unwrap());
         let cmp = map.clone().eq(other.clone());
@@ -355,55 +487,168 @@ mod tests {
             }
         }
         assert!(cmp);
-
     }
 
     #[test]
     fn parse0() {
         let grammar = crate::grammar_parse::parse("a -> \"a\"").unwrap();
-        let (rem, Ok(tree)) = grammar.parse_text("a")
-        else {todo!()};
+        let (rem, Ok(tree)) = grammar.parse_text("a") else {
+            todo!()
+        };
 
-        assert_eq!(tree, ParseTree{
-            node: ParseNode::Terminal(ParseTerminal{
+        assert_eq!(
+            tree,
+            ParseNode::NonTerminal(ParseNonTerminal {
                 name: "a".to_string(),
-            }),
-            children: Vec::new(),
-        });
+                child: Box::new(ParseNode::Sequence(ParseSequence{
+                    content: vec![ParseNode::Terminal(ParseTerminal {
+                        name: "a".to_string(),
+                    })]})),
+            })
+        );
         assert_eq!(rem, "");
     }
 
     #[test]
     fn parse1() {
         let grammar = crate::grammar_parse::parse("a -> \"a\"").unwrap();
-        let (rem, Ok(tree)) = grammar.try_terminal("a", &Terminal{
-            name: "a".to_string(),
-        })
-        else {
+        let (rem, Ok(tree)) = grammar.try_terminal(
+            "a",
+            &Terminal {
+                name: "a".to_string(),
+            },
+        ) else {
             todo!()
         };
 
-        assert_eq!(tree, ParseTree{
-            node: ParseNode::Terminal(ParseTerminal{
+        assert_eq!(
+            tree,
+            ParseNode::Terminal(ParseTerminal {
                 name: "a".to_string(),
             }),
-            children: Vec::new(),
-        });
+        );
         assert_eq!(rem, "");
     }
 
     #[test]
     fn parse2() {
         let grammar = crate::grammar_parse::parse("a -> \"a\"").unwrap();
-        let (rem, Err(ParseError)) = grammar.try_terminal("b", &Terminal{
-            name: "a".to_string(),
-        })
-        else {
+        let (rem, Err(ParseError)) = grammar.try_terminal(
+            "b",
+            &Terminal {
+                name: "a".to_string(),
+            },
+        ) else {
             todo!()
         };
 
         assert_eq!(rem, "b");
     }
+
+    #[test]
+    fn parse3() {
+        let grammar = crate::grammar_parse::parse("a -> b\nb -> \"a\"").unwrap();
+        let (rem, Ok(tree)) = grammar.parse_text("a") else {
+            todo!()
+        };
+
+        assert_eq!(
+            tree,
+            ParseNode::NonTerminal(ParseNonTerminal {
+                name: "a".to_string(),
+                child:Box::new(ParseNode::Sequence(ParseSequence{
+                 content: vec![ParseNode::NonTerminal(ParseNonTerminal {
+                    name: "b".to_string(),
+                    child:Box::new(ParseNode::Sequence(ParseSequence{
+                        content: vec![ParseNode::Terminal(ParseTerminal {
+                            name: "a".to_string(),
+                        }),],
+                    }))
+                })]})),
+            })
+        );
+        assert_eq!(rem, "");
+    }
+
+    #[test]
+    fn parse4() {
+        let grammar = crate::grammar_parse::parse("a -> b \"a\"\nb -> \"b\"").unwrap();
+        let (rem, Ok(tree)) = grammar.parse_text("ba") else {
+            todo!()
+        };
+
+        assert_eq!(
+            tree,
+            ParseNode::NonTerminal(ParseNonTerminal {
+                name: "a".to_string(),
+                child:Box::new(ParseNode::Sequence(ParseSequence{
+                    content: vec![
+                        ParseNode::NonTerminal(ParseNonTerminal {
+                            name: "b".to_string(),
+                            child:Box::new(ParseNode::Sequence(ParseSequence{
+                                content: vec![ParseNode::Terminal(ParseTerminal {
+                                    name: "b".to_string()
+                                })],
+                            }))
+                        }),
+                        ParseNode::Terminal(ParseTerminal {
+                            name: "a".to_string(),
+                        }),
+                    ],
+
+                }))
+            }),
+        );
+        assert_eq!(rem, "");
+    }
+
+    #[test]
+    fn parse5() {
+        let grammar = crate::grammar_parse::parse("a -> b \"a\"\nb -> \"b\"").unwrap();
+        let text = "b";
+        let (_rem, Ok(tree)) = grammar.try_non_terminal(text, grammar.non_terminal("b"))
+            else{
+                todo!()
+            };
+
+        assert_eq!(tree, ParseNode::NonTerminal(ParseNonTerminal{
+            name: "b".to_string(),
+            child: Box::new(ParseNode::Sequence(
+                    ParseSequence{
+                        content: vec![
+                            ParseNode::Terminal(ParseTerminal{
+                                name: "b".to_string(),
+                            })
+                        ]
+                    }
+            ))
+        }))
+    }
+
+    #[test]
+    fn parse6() {
+        let grammar = crate::grammar_parse::parse("a -> \"a\"").unwrap();
+        println!("{}", grammar);
+        let text = "b";
+        let (_rem, Ok(tree)) = grammar.try_non_terminal(text, grammar.non_terminal("a"))
+            else{
+                todo!()
+            };
+
+        assert_eq!(tree, ParseNode::NonTerminal(ParseNonTerminal{
+            name: "b".to_string(),
+            child: Box::new(ParseNode::Sequence(
+                    ParseSequence{
+                        content: vec![
+                            ParseNode::Terminal(ParseTerminal{
+                                name: "b".to_string(),
+                            })
+                        ]
+                    }
+            ))
+        }))
+    }
+
 
     // #[test]
     // fn grammar1() {
@@ -420,9 +665,9 @@ mod tests {
     //     println!("{}", grammar.production_iter("a").count());
     // }
 
-//     #[test]
-//     fn produce0() {
-//         let grammar = grammar_parse::parse("a -> \"a\"");
-//         let out = grammar.unwrap().produce();
-//     }
+    //     #[test]
+    //     fn produce0() {
+    //         let grammar = grammar_parse::parse("a -> \"a\"");
+    //         let out = grammar.unwrap().produce();
+    //     }
 }

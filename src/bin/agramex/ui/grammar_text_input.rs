@@ -1,9 +1,6 @@
 use gloo_console::log;
+use web_sys::InputEvent;
 use yew::prelude::*;
-use web_sys::{InputEvent};
-
-
-
 
 #[function_component]
 pub fn GrammarTextInput() -> Html {
@@ -24,5 +21,3 @@ pub fn GrammarTextInput() -> Html {
         <textarea {oninput} id="grammar_input">{state.te}</textarea>
     }
 }
-
-
