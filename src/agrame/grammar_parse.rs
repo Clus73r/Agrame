@@ -128,10 +128,6 @@ fn into_grammar(parse: ParsedProductions) -> Grammar {
                 let exprs: Vec<ProductionBuilder> =
                     seq.iter().map(|e| process_expression(e, grammar)).collect();
                 ProductionBuilder::Sequence(exprs)
-                // for production_expression in seq {
-                //     process_expression(production_expression, grammar);
-                // }
-                // ProductionBuilder::Sequence(())
             }
         }
     }
@@ -159,6 +155,8 @@ pub fn parse(input: &str) -> Result<Grammar> {
 
 #[cfg(test)]
 mod tests {
+    use crate::grammar::Production;
+
     use super::*;
 
     #[test]
@@ -297,5 +295,74 @@ mod tests {
                 }
             ))
         );
+    }
+
+    #[test]
+    fn parse_productions1() {
+        assert_eq!(
+            super::parse_productions("a -> a b\na -> \"b\""),
+            IResult::Ok((
+                "",
+                ParsedProductions {
+                    productions: vec![
+                        ParsedProduction {
+                            lhs: ProductionExpression::NonTerminal("a".to_string()),
+                            rhs: ProductionExpression::Sequence(vec![
+                                ProductionExpression::NonTerminal("a".to_string()),
+                                ProductionExpression::NonTerminal("b".to_string()),
+                            ])
+                        },
+                        ParsedProduction {
+                            lhs: ProductionExpression::NonTerminal("a".to_string()),
+                            rhs: ProductionExpression::Sequence(vec![
+                                ProductionExpression::Terminal("b".to_string()),
+                            ])
+                        },
+                    ]
+                }
+            ))
+        );
+    }
+    #[test]
+    fn into_grammar0() {
+        let mut grammar = Grammar::new();
+        grammar.add_non_terminal("a");
+        grammar.add_non_terminal("b");
+        grammar.add_terminal("b");
+        let _ = grammar.add_production(
+            "a",
+            ProductionBuilder::Sequence(vec![
+                ProductionBuilder::NonTerminal("a".to_string()),
+                ProductionBuilder::NonTerminal("b".to_string()),
+            ]),
+        );
+        let _ = grammar.add_production(
+            "b",
+            ProductionBuilder::Sequence(vec![ProductionBuilder::Terminal("b".to_string())]),
+        );
+        // assert_eq!(
+        //     into_grammar(super::parse_productions("a -> a b\nb -> \"b\"").unwrap().1),
+        //     grammar);
+        //     IResult::Ok((
+        //         "",
+        //         ParsedProductions {
+        //             productions: vec![
+        //                 ParsedProduction {
+        //                     lhs: ProductionExpression::NonTerminal("a".to_string()),
+        //                     rhs: ProductionExpression::Sequence(vec![
+        //                         ProductionExpression::NonTerminal("a".to_string()),
+        //                         ProductionExpression::NonTerminal("b".to_string()),
+        //                     ])
+        //                 },
+        //                 ParsedProduction {
+        //                     lhs: ProductionExpression::NonTerminal("b".to_string()),
+        //                     rhs: ProductionExpression::Sequence(vec![
+        //                         ProductionExpression::Terminal("b".to_string()),
+        //                     ])
+        //                 },
+        //             ]
+        //         }
+        //     ))
+        // );
     }
 }
